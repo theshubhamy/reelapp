@@ -1,4 +1,4 @@
-import React, {useRef, useCallback, useState} from 'react';
+import React, {useRef, useCallback, useState, useEffect} from 'react';
 import {
   FlatList,
   View,
@@ -6,9 +6,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import SingleReel from './components/SingleReel';
-
 import {useAutoContinue} from './hooks/useAutoContinue';
-import {SwiperFlatList} from './components/SwiperFlatList';
 import {reelData} from './constants/reelsData';
 
 interface Owner {
@@ -75,10 +73,11 @@ const VideoStreaming: React.FC = () => {
 
   const mediaData = reelData;
 
-  // Function to handle refreshing
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setRefreshing(false);
+    setTimeout(() => {
+      setRefreshing(false);
+    }, 1000);
   }, []);
 
   const {
@@ -90,19 +89,26 @@ const VideoStreaming: React.FC = () => {
   } = useAutoContinue(flatListRef, mediaData.length, screenHeight);
 
   const handleEndReached = () => {
-    const mediaDataLength = mediaData.length || 0;
-    if (currentIndex >= mediaDataLength - 2) {
+    if (currentIndex >= (mediaData.length || 0) - 2) {
+      // Fetch or load more data here if needed
     }
   };
 
   const handleViewableItemsChanged = useCallback(
     ({viewableItems}: {viewableItems: any[]}) => {
       if (viewableItems.length > 0) {
-        setCurrentIndex(viewableItems[0].index);
+        const nextIndex = viewableItems[0]?.index;
+        if (nextIndex !== currentIndex) {
+          setCurrentIndex(nextIndex);
+        }
       }
     },
-    [setCurrentIndex],
+    [currentIndex, setCurrentIndex],
   );
+
+  const viewabilityConfig = {
+    itemVisiblePercentThreshold: 50, 
+  };
 
   const renderItem = useCallback(
     ({item, index}: {item: MediaItem; index: number}) => (
@@ -132,27 +138,30 @@ const VideoStreaming: React.FC = () => {
     ],
   );
 
-  const keyExtractor = useCallback((item: any) => item._id.toString(), []);
+  const keyExtractor = useCallback((item: MediaItem) => item._id, []);
 
   return (
-    <View style={{height: screenHeight}}>
-      <SwiperFlatList
+    <View style={{flex: 1, height: screenHeight}}>
+      <FlatList
         data={mediaData || []}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
-        index={currentIndex}
-        vertical
-        decelerationRate={'normal'}
+        ref={flatListRef}
         renderItem={renderItem}
-        disableIntervalMomentum={true}
-        onViewableItemsChanged={handleViewableItemsChanged}
-        initialNumToRender={1}
-        maxToRenderPerBatch={10}
-        windowSize={1}
         keyExtractor={keyExtractor}
         onEndReached={handleEndReached}
-        onEndReachedThreshold={0.8}
+        onEndReachedThreshold={0.5}
+        initialNumToRender={2}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        onViewableItemsChanged={handleViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        decelerationRate={'fast'}
+        removeClippedSubviews={false}
+        disableIntervalMomentum={true}
+        pagingEnabled
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
